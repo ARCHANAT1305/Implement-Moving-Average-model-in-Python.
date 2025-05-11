@@ -1,0 +1,1 @@
+# Implement-Moving-Average-model-in-Python.
