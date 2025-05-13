@@ -20,56 +20,57 @@ To implement Moving Average Model and Exponential smoothing Using Python.
 ### REGISTER NUMBER : 212223240013
 ```
 import numpy as np
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 import warnings
+import sys
 
 warnings.filterwarnings("ignore")
 
-# Load dataset
+
 try:
-    data = pd.read_csv('powerconsumption.csv')
+    data = pd.read_csv('Online Retail.csv', encoding='ISO-8859-1')
 except FileNotFoundError:
-    print("The dataset 'powerconsumption.csv' was not found.")
-    exit()
+    print("The dataset 'Online Retail.csv' was not found.")
+    sys.exit()
 
-# Convert 'Datetime' to datetime format
-data['Datetime'] = pd.to_datetime(data['Datetime'], errors='coerce')
-data.dropna(subset=['Datetime'], inplace=True)
-data.set_index('Datetime', inplace=True)
 
-# Limit to first 100 rows
-data = data.iloc[:100]
+data['InvoiceDate'] = pd.to_datetime(data['InvoiceDate'], errors='coerce')
+data.dropna(subset=['InvoiceDate'], inplace=True)
 
-# Combine power consumption across all zones
-data['TotalPower'] = (
-    data['PowerConsumption_Zone1'] +
-    data['PowerConsumption_Zone2'] +
-    data['PowerConsumption_Zone3']
-)
 
-# Use only TotalPower
-power_data = data[['TotalPower']]
+data = data[(data['Quantity'] > 0) & (data['UnitPrice'] > 0)]
 
-# Display basic info
+
+data['TotalSales'] = data['Quantity'] * data['UnitPrice']
+
+
+data.set_index('InvoiceDate', inplace=True)
+
+data = data[(data.index >= '2010-12-01') & (data.index < '2011-12-01')]
+
+
+power_data = data[['TotalSales']].copy()
+power_data.rename(columns={'TotalSales': 'TotalPower'}, inplace=True)
+
+
 print("Shape of the dataset:", power_data.shape)
 print("First 10 rows:")
 print(power_data.head(10))
 
-# Plot original power consumption
 plt.figure(figsize=(12, 6))
 plt.plot(power_data['TotalPower'], label='Original Power Consumption')
-plt.title('Power Consumption (First 100 Entries)')
+plt.title('Sales (First 100 Entries)')
 plt.xlabel('Date')
-plt.ylabel('Power (kWh)')
+plt.ylabel('Total Sales (£)')
 plt.legend()
 plt.grid()
 plt.show()
 
-# Moving averages
 rolling_mean_5 = power_data['TotalPower'].rolling(window=5).mean()
 rolling_mean_10 = power_data['TotalPower'].rolling(window=10).mean()
 
@@ -79,14 +80,15 @@ plt.plot(rolling_mean_5, label='5-period MA')
 plt.plot(rolling_mean_10, label='10-period MA')
 plt.title('Moving Averages (First 100 Entries)')
 plt.xlabel('Date')
-plt.ylabel('Power (kWh)')
+plt.ylabel('Total Sales (£)')
 plt.legend()
 plt.grid()
 plt.show()
 
-# Resample to monthly totals (may result in fewer than expected points)
+
 monthly_data = power_data.resample('MS').sum()
 
+# Interpolate if missing values exist
 if monthly_data.isnull().sum().any():
     print("Missing values found in resampled data. Interpolating...")
     monthly_data.interpolate(method='linear', inplace=True)
@@ -97,14 +99,12 @@ scaled_data = pd.Series(
     scaler.fit_transform(monthly_data).flatten(),
     index=monthly_data.index
 )
-scaled_data += 1  # Avoid zero for multiplicative
+scaled_data += 1  # Avoid zero for multiplicative seasonality
 
-# Train-test split
 split = int(len(scaled_data) * 0.8)
 train_data = scaled_data[:split]
 test_data = scaled_data[split:]
 
-# Determine seasonal_periods
 seasonal_periods = 12
 if len(train_data) < 2 * seasonal_periods:
     print(f"Warning: Not enough data for {seasonal_periods} seasonal periods. Reducing.")
@@ -114,7 +114,7 @@ if len(train_data) < 2 * seasonal_periods or seasonal_periods <= 1:
     print("Insufficient data for seasonality. Using non-seasonal model.")
     seasonal_periods = None
 
-# Fit and forecast
+
 if len(train_data) <= 1:
     print("Error: Not enough data points to fit the model.")
 else:
@@ -130,9 +130,9 @@ else:
     train_data.plot(label='Train Data')
     test_data.plot(label='Test Data')
     forecast.plot(label='Forecast')
-    plt.title('Power Consumption Forecast (Test Period)')
+    plt.title('Sales Forecast (Test Period)')
     plt.xlabel('Date')
-    plt.ylabel('Scaled Power')
+    plt.ylabel('Scaled Sales')
     plt.legend()
     plt.grid()
     plt.show()
@@ -140,7 +140,6 @@ else:
     rmse = np.sqrt(mean_squared_error(test_data, forecast))
     print("Test RMSE:", rmse)
 
-    # Final forecast
     final_model = ExponentialSmoothing(
         scaled_data,
         trend='add',
@@ -152,21 +151,22 @@ else:
     plt.figure(figsize=(12, 6))
     scaled_data.plot(label='Historical Data')
     future_forecast.plot(label='Future Forecast')
-    plt.title('Future Forecast (Next 12 Months)')
+    plt.title('Future Sales Forecast (Next 12 Months)')
     plt.xlabel('Date')
-    plt.ylabel('Scaled Power')
+    plt.ylabel('Scaled Sales')
     plt.legend()
     plt.grid()
     plt.show()
+
  
 ```
 ## OUTPUT:
-![image](https://github.com/user-attachments/assets/11cde568-bb17-4905-9797-2eb21f730e0e)
+![image](https://github.com/user-attachments/assets/e57257af-81c0-4f26-9f6b-ad59015bb136)
+![image](https://github.com/user-attachments/assets/e7d8b5a7-0ae2-4303-a635-6666784956aa)
+![image](https://github.com/user-attachments/assets/f4add8fa-e098-45fb-9fbd-e93ec6cd9083)
+![image](https://github.com/user-attachments/assets/c6e8c84a-4c33-4ba6-bad3-999f725a662d)
+![image](https://github.com/user-attachments/assets/0776239c-3630-4652-8f06-7f7bf7ca1cd5)
 
-
-![image](https://github.com/user-attachments/assets/bcfaa126-d17e-4641-a221-9284a2610b90)
-
-![image](https://github.com/user-attachments/assets/80baaa12-10bc-4f7c-bd92-7c46d5841485)
 
 
 
